@@ -1,2 +1,2 @@
 # chroGPS2
-Routines and data for chroGPS2 Bioconductor package in development
+Main routines, data and supplementary example code for several case studies using chroGPS2 Bioconductor package in development.
