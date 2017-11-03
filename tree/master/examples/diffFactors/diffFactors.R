@@ -1,1 +1,0 @@
-# Compare chroGPS-factors maps
