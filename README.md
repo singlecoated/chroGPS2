@@ -10,4 +10,5 @@ Previously, we developed chroGPS, an R package based on dimensionality reduction
 References
 
 chroGPS package: https://www.bioconductor.org/packages/release/bioc/html/chroGPS.html
+
 chroGPS publication: https://academic.oup.com/nar/article/42/4/2126/2437048
