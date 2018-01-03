@@ -1,1 +1,7 @@
 Data objects to use in example code.
+
+s2.RData contains modENCODE genomic interval ChIP-chip binding site and related information for the 76 Drosophila melanogaster SL2 cell line epigenetic factors used in Font-Burgada el al. 2014.
+
+bg3.RData contains modENCODE genomic interval binding site and related information for the 46 Drosophila melanogaster BG3 cell line epigenetic factors used in Font-Burgada el al. 2014.
+
+s2Seq contains ChIP-Seq genomic interval binding site and related information for the 4 Drosophila melanogaster SL2 cell line epigenetic factors used in Font-Burgada el al. 2014 (GSE19325).
