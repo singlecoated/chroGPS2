@@ -1,7 +1,7 @@
 > load('/Volumes/biostats/research/chroGPS/data/Paper/Main/s2_Jan13.RData')
 
 > class(s2)
-[1] "RangedDataList"
+[1] "RangedDataList" 
 attr(,"package")
 [1] "IRanges"
 
