@@ -7,9 +7,11 @@ setMethod("show","distGPS",function(object) {
 }
 )
 
+setGeneric("as.matrix", function(x) standardGeneric("as.matrix"))
+
 ## as.matrix
-setMethod("as.matrix",signature(x="distGPS"),function(x) {
-  as.matrix(x@d)
+setMethod("as.matrix","distGPS",function(x) {
+    x@d
 }
 )
 

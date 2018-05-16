@@ -1,0 +1,345 @@
+\documentclass[a4paper,12pt,nogin]{article}
+%\VignetteIndexEntry{Manual for the chroGPS library}
+%\VignettePackage{chroGPS}
+
+\usepackage{amsmath}    % need for subequations
+\usepackage{amssymb}    %useful mathematical symbols
+\usepackage{bm}         %needed for bold greek letters and math symbols
+\usepackage{graphicx}   % need for PS figures
+%\usepackage{verbatim}   % useful for program listings
+\usepackage{color}      % use if color is used in text
+\usepackage{hyperref}   % use for hypertext links, including those to external documents and URLs
+\usepackage{natbib}    %number and author-year style referencing
+%\usepackage{epsf} 
+%\usepackage{lscape} 
+%\bibpunct{(}{)}{;}{a}{,}{,}
+\usepackage[hmargin=3cm,vmargin=3cm]{geometry}
+\newcommand{\newtext}[1]{{\color{black} #1}} %Use \newtext{This is new text}
+\newcommand{\drcomment}[1]{{\color{red} #1}} %Use \drcomment{This is a comment}
+
+%\pagestyle{empty} % use if page numbers not wanted
+
+\SweaveOpts{keep.source=TRUE} % Keep code 'as is'
+
+\begin{document}
+
+\title{\texttt{chroGPS}: visualizing the epigenome. }
+\small
+\author{Oscar Reina \footnote{Bioinformatics \& Biostatistics Unit,
+        IRB Barcelona}  and David Rossell
+    \footnotemark[1] }
+\normalsize
+\date{}  %comment to include current date
+
+\maketitle
+
+
+\section{Introduction}
+\label{sec:intro}
+
+The \texttt{chroGPS} package provides tools to generate intuitive maps to visualize the association between genetic elements, with emphasis on epigenetics. The approach is based on Multi-Dimensional Scaling. We provide several sensible distance metrics, and adjustment procedures to remove systematic biases typically observed when merging data obtained under different technologies or genetic backgrounds.
+This manual illustrates the software functionality and highlights some ideas,
+for a detailed technical description the reader is referred to the supplementary material on \citep{font:2013}.
+\\\\
+Many routines allow performing computations in parallel 
+by specifying an argument \texttt{mc.cores}, which uses
+package \newtext{\texttt{parallel}.
+  }
+\\\\
+We start by loading the package and a ChIP-chip dataset with genomic
+distribution of 20 epigenetic elements from the Drosophila melanogaster
+S2-DRSC cell line, coming from the modEncode project, which we will use for illustration purposes.
+Even though our study and examples focuses on assessing associations
+between genetic elements, this methodology can be successfully used with
+any kind of multivariate data where relative distances between
+elements of interest can be computed based on a given set of variables.
+
+\section{chroGPS$^{factors}$}
+\label{sec:chrogps_factors}
+
+\footnotesize
+
+<<<import1>>=>>=
+library(caTools)
+library(gplots)
+library(chroGPS)
+
+data(s2)
+data(bg3)
+
+# Unify replicates
+mnames <- sort(unique(intersect(s2names$Factor,bg3names$Factor)))
+sel <- s2names$Factor %in% mnames
+s2.repset <- mergeReplicates(s2[sel],id=s2names$Factor[sel],mergeBy='any')
+sel <- bg3names$Factor %in% mnames
+bg3.repset <- mergeReplicates(bg3[sel],id=bg3names$Factor[sel],mergeBy='any')
+
+# Generate unified domain names
+color2domain <- c('Active','Active','HP1a','Polycomb','Boundaries')
+names(color2domain) <- c('lightgreen','purple','lightblue','yellow','grey')
+domains <- unique(s2names[s2names$Factor %in% mnames,c('Factor','Color')])
+domains$Domain <- color2domain[domains$Color]
+rownames(domains) <- domains$Factor
+
+# Compute distances
+d.s2 <- distGPS(GRangesList(s2.repset),metric='avgdist',mc.cores=8)
+d.bg3 <- distGPS(GRangesList(bg3.repset),metric='avgdist',mc.cores=8)
+
+# Compute inter-domain distances
+dd.s2 <- domainDist(as.matrix(d.s2),gps='factors',domain=domains$Color,type='inter',plot=FALSE)
+dd.bg3 <- domainDist(as.matrix(d.bg3),gps='factors',domain=domains$Color,type='inter',plot=FALSE)
+
+# Random seed
+set.seed(149)
+# Alterate s2
+s2.alt <- s2.repset
+s2.alt[['EZ']] <- GRanges(rbind(as.data.frame(s2.repset[['GAF']])[sample(1:(length(s2.repset[['GAF']])/2)),],
+                                as.data.frame(s2.repset[['HP1B']])[sample(1:(length(s2.repset[['HP1B']])/2)),]))
+d.s2.alt <- distGPS(GRangesList(s2.alt),metric='avgdist',mc.cores=12)
+
+# Plot S2 vs BG3
+par(las=1,mar=c(4,8,4,4))
+mycors1 <- rev(diag(cor(as.matrix(d.s2),as.matrix(d.bg3))))
+barplot(mycors1,horiz=TRUE,xlim=c(0,1),main='S2 / BG3',col=domains[names(mycors1),'Color'],font=2)
+for (i in 1:length(summary(mycors1))) abline(v=summary(mycors1)[i],col=i,lwd=2,lty=3)
+
+# Plot S2 Altered vs BG3
+par(las=1,mar=c(4,8,4,4))
+mycors2 <- rev(diag(cor(as.matrix(d.s2.alt),as.matrix(d.bg3))))
+barplot(mycors2,horiz=TRUE,xlim=c(0,1),main='S2 Altered / BG3',col=domains[names(mycors2),'Color'],font=2)
+for (i in 1:length(summary(mycors2))) abline(v=summary(mycors2)[i],col=i,lwd=2,lty=3)
+@ 
+
+\normalsize
+
+\texttt{s2} is a \texttt{GRangesList} object storing the
+binding sites for 20 Drosophila melanogaster S2-DRSC sample
+proteins. Data was retrieved from the modEncode website
+(www.modencode.org) and belongs to the public subset of the Release 29.1 dataset. GFF files
+were downloaded, read and formatted into individual GRanges
+objects, stored later into a \texttt{GRangesList} (see functions \texttt{getURL} and 
+\texttt{gff2RDList} for details.) For shortening computing time for the dynamic generation of this document, some of the distances between epigenetic factors have been precomputed and stored in the \texttt{toydists} object.
+  
+\subsection{Building chroGPS$^{factors}$ maps}
+\label{ssec:factormaps}
+ 
+The methodology behing chroGPS$^{factors}$ is to generate a distance
+matrix with all the pairwise distances between elements of interest by
+means of a chosen metric. After this, a Multidimensional Scaling
+representation is generated to fit the n-dimensional distances in a
+lower (usually 2 or 3) k-dimensional space.
+ 
+\footnotesize
+ 
+<<<mds1>>=>>=
+## Rank Factors by Domain, using intra/inter domain distance
+
+data(s2)
+data(toydists)
+#d <- distGPS(s2,metric='avgdist',mc.cores=8) # Compute distances
+rownames(s2names) <- s2names$ExperimentName
+
+# Known domains
+# Call rankFactors for HP1a repression domain, select a combination of 4 factors
+library(caTools)
+rank.factors.4 <- rankFactors(d,s2names,ranktype='domainDist',selName='Color',selValue='lightblue',k=3,mc.cores=4) # Test HP1a repression
+ddd <- as.data.frame(do.call(rbind,lapply(rank.factors.4,unlist)))
+ddd <- ddd[order(ddd$intra,decreasing=FALSE),]
+head(ddd)
+
+# Unknown domains
+glm.rank <- predictFactors(s2.tab,ranktype='glm',glm.threshold=0.75,mc.cores=8)
+
+# Returned objects are lists named by the factor with highest prediction accuracy in each interation, as well as the rest, let's generate a matrix
+library(gtools)
+glm.rank <- do.call(smartbind,glm.rank)
+
+# Now let's order based on which factor is removed in each iteration
+glm.rank <- glm.rank[,rownames(glm.rank)]
+glm.rank[1:5,1:5]
+
+# And finally some plots...
+boxplot(glm.rank,horizontal=TRUE,lwd=2,ylab='',xlab='Prediction accuracy',names=rownames(glm.rank),col=rainbow(nrow(glm.rank)))
+@ 
+
+\normalsize
+ 
+The R$^2$ coefficient between the original distances and their approximation in the
+plot 
+can be seen as an analogue to the percentage of explained variability in a PCA analysis.
+For our sample data R$^2$=0.628
+%(up to rounding), 
+and stress=0.079 in the 2-dimensional plot, both of which
+indicate a fairly good fit. A 3-dimensional plot improves these
+values.
+We can produce a map by using the \texttt{plot} method for \texttt{MDS} objects.
+The result in shown in Figure \ref{fig:mds1}.
+For 3D representations the \texttt{plot} method opens an interactive window
+that allows to take full advantage of the additional dimension.
+Here we commented out the code for the 3D plot and simply show a
+snapshot in Figure \ref{fig:mds1}. Short names for modEncode factors
+as well as colors for each chromatin domain identified
+(lightgreen=transcriptionally active elements, purple=Polymerase, grey=boundary
+elements, yellow=Polycomb repression, lightblue=HP1 repression) are
+provided in the data frame object \texttt{s2names}, stored within \texttt{s2}.
+
+\footnotesize
+
+<<<figmds1>>=>>=
+# Intersect s2 with repliSeq, filter peaks by overlap with origin set
+# Assuming the 'orig' objects is a RangedDataList with modEncode S2 origins of Replication for Early to Late timepoints
+# Assuming S2 has the 'full' S2 dataset used in Font-Burgada et al. 2014
+#s2.origs <- lapply(orig,function(o) GRangesList(mclapply(as.list(s2),function(x) x[x %over% o,],mc.cores=8)))
+
+# Make distance sets
+#d.origs <- lapply(s2.origs,function(x) distGPS(x,metric='avgdist',mc.cores=12))
+#m.origs <- lapply(d.origs,mds,type='isoMDS')
+
+# Now load precomputed data
+data(s2)
+data(repliSeq)
+library(gplots)
+
+# Modify colors and add some transparency
+fnames <- s2names$Factor
+s2names$Color[s2names$Color=='grey'] <- 'orange'
+fcolors <- paste(col2hex(s2names$Color),'BB',sep='')
+bcolors <- paste(col2hex(s2names$Color),'FF',sep='')
+
+# Select time points to compare
+m1 <- m.origs[['Early.Mid']]
+m2 <- m.origs[['Late']]
+
+## Perform differential Procrustes analysis
+pp <- diffFactors(m1,m2)
+
+## Plot both maps before and after adjustment
+m3 <- pp$mds3
+plot(0,xlim=c(-1,1),ylim=c(-1,1),xlab='',ylab='',xaxt='n',yaxt='n',col='NA')
+segments(m1@points[,1],m1@points[,2],m3@points[,1],m3@points[,2],col='red')
+par(new=TRUE)
+plot(m1,drawlabels=TRUE,labels=s2names$Factor,point.pch=19,point.cex=4,text.cex=0.75,point.col=s2names$Color,main=sprintf('S2@Origins, adjusted (Avgdist-isoMDS)'),font=2,xlim=c(-1,1),ylim=c(-1,1))
+par(new=TRUE)
+plot(m3,drawlabels=TRUE,labels=s2names$Factor,point.pch=19,point.cex=4,text.cex=0.75,point.col=s2names$Darkcolor,text.col='grey',main='',xaxt='n',yaxt='n',font=2,xlim=c(-1,1),ylim=c(-1,1))
+
+## Plot Procrustes errors
+pp <- pp$procrustes
+par(las=1,mar=c(4,12,4,4)); barplot(sort(residuals(pp),decr=TRUE),horiz=TRUE,xlim=c(0,max(residuals(pp))+.1),col=heat.colors(length(residuals(pp))),main='Procrustes errors')
+hist(residuals(pp),breaks=50)
+@ 
+
+\subsection{Integrating data sources: technical background}
+\label{ssec:tecbias}
+ 
+Currently, genomic profiling of epigenetic factors is being largely
+determined through high throughput methodologies such as
+ultra-sequencing (ChIP-Seq), which identifies binding sites with higher
+accuracy that ChIP-chip experiments. However, there is an extensive
+knowledge background based on the later. ChroGPS allows
+integrating different technical sources by adjusting for
+systematic biases.
+\\\\
+We propose two adjustment methods: Procrustes and Peak Width 
+Adjustment. Procrustes finds the optimal superimposition of two sets of
+points by altering their location, scale and orientation while
+maintaining their relative distances. It is therefore a
+general method of adjustment that can take care of several kind of
+biases. However, its main limitation is that a minimal set of common
+points (that is, the same factor/protein binding sites mapped in both data sources) is needed to effectively perform a valid adjustment. Due to the spatial nature of Procrustes adjustment, we strongly recommend a minimum number of 3 common points.
+
+We illustrate the adjustments by loading {\it Drosophila melanogaster}
+S2 ChIP-seq data obtained from NCBI GEO GSE19325, \url{http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE19325}. We start by producing a joint map with no adjustment.
+
+
+\footnotesize
+ 
+<<<figprocrustes1>>=>>=
+# Summarize factor replicates with method 'any' so that 1 replicate having the mark is enough
+# Assuming s2.tab and bg3.tab contain the full datasets for dm3 genome and all factors used in Font-Burgada et al.
+# s2.tab <- mergeReplicates(s2.tab,s2names$Factor,'any')
+# bg3.tab <- mergeReplicates(bg3.tab,bg3names$Factor,'any')
+
+# Join, use common factors. Then use common genes only from those that have at least one mark in both s2 and bg3
+# x <- combineGenesMatrix(s2.tab,bg3.tab,'S2','BG3')
+
+# Build map and cluster as always
+# d <- distGPS(x,metric='tanimoto',uniqueRows=TRUE)
+
+# Not run
+# m <- mds(d,type='classic',splitMDS=TRUE,split=0.16,mc.cores=4)
+# mm <- mds(d,m,type='boostMDS',samplesize=0.005,mc.cores=6)
+# unique(rownames(m@points)==rownames(mm@points)) # sanity check
+# This should be incorporated in the function code...
+#m@points <- m@points[rownames(d@d),]
+#mm@points <- mm@points[rownames(d@d),]
+
+# Cluster
+# h <- hclust(as.dist(d@d),method='average')
+# clus <- clusGPS(d,mm,h,k=max(cutree(h,h=0.5)),ngrid=10000,mc.cores=8,recalcDist=FALSE,verbose=FALSE)
+# clus.merged <- mergeClusters(clus,brake=0,mc.cores=8)
+# clus
+# clus.merged
+
+# Use new function to profile clusters
+# pc <- profileClusters2(x,clus.merged,normalize=TRUE)
+# pheatmap(pc,trace='none',scale='none',col=bluered(100))
+
+# Perform differential analysis
+# x.diff <- res <- diffGPS.clus(x,mm,clus.merged,label.x='S2',label.y='BG3',clusName=clusNames(clus.merged)[1],fdr=TRUE,mc.cores=8)
+# write.csv(x.diff,'diffgenes_fdrest.csv')
+
+# Select genes changing clusters with FDR 0.05
+# xx.diff <- x.diff[x.diff$ClusID.S2!=x.diff$ClusID.BG3 & x.diff$FDR.S2<0.25 & x.diff$FDR.BG3<0.25,]
+# xx.diff$CC <- paste(xx.diff$ClusID.S2,xx.diff$ClusID.BG3,sep='.')
+# head(sort(table(xx.diff$CC),decreasing=TRUE))
+# write.csv(xx.diff,'kk_fdrest2.csv')
+
+# Perform enrichment test using getEnrichedGO from chippeakanno package
+# library(ChIPpeakAnno)
+# library(org.Dm.eg.db)
+
+# enriched.GO <- lapply(c('2.9','5.2'),function(cc) {
+#        fbid <- as.character(xx.diff$geneid[xx.diff$CC==cc])
+#            if (length(fbid)>=25)
+#                        ans <- getEnrichedGO(annotatedPeak=fbid,orgAnn='org.Dm.eg.db',maxP=0.05,multiAdjMethod='BH')
+#            else ans <- NULL
+#            return(ans)
+#    })
+
+# names(enriched.GO) <- c('2.9','5.2')
+# enriched.GO <- enriched.GO[unlist(lapply(enriched.GO,length))>0]
+# enriched.GO <- lapply(enriched.GO,function(x) lapply(x,function(y) unique(y[,-ncol(y)])))
+# lapply(enriched.GO,head)
+
+# Plot results with diffGPS.plot function
+# res.sel <- res[res$ClusID.S2!=res$ClusID.BG3,]
+
+# Plot
+# diffGenes.plot(x,mm,clus.merged,res.sel,transitions='10.2',label.x='S2',label.y='BG3',fdr1=0.25,fdr2=0.25)
+
+# The end
+@ 
+
+\subsection{Beyond R: exporting chroGPS maps to Cytoscape}
+\label{sec:export2Cytoscape}
+
+No doubt R is a wonderful environment, but it has its limitations and
+it may not be the most direct software to use for biologists. Having
+that in mind, we developed a function for exporting any of the MDS
+graphics from our chroGPS maps as an XGMML format network for the
+widely used Cytoscape software \url{http://www.cytoscape.org}, \citep{shannon:2003}.
+Network nodes are identified by their factor or epigene
+name, so that importing external information (i.e. expression values)
+or expanding the original chroGPS object with for instance external
+regulation networks, Gene Ontology enrichments, etc, becomes natural
+for Cytoscape users.
+\\
+Even if no edges are returned, the exported network keeps the relative
+distribution of elements as seen in chroGPS, in order to keep the
+distances between the original elements intact. For three-dimensional maps Cytoscape 3D Renderer is required.
+
+\bibliographystyle{plainnat}
+\bibliography{references} 
+
+\end{document}
+

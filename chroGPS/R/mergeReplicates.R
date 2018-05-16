@@ -1,5 +1,41 @@
-## Remember, careful with nested mclapplys, got error of promise under evaluation
+## standard Generic
+setGeneric("mergeReplicates", function(x,id,mergeBy='any',mc.cores=1) standardGeneric("mergeReplicates"))
 
+## Genes x Factors matrix
+setMethod("mergeReplicates",signature(x='matrix'),
+          function(x,id,mergeBy='any',mc.cores=1) {
+              mergeReplicateMatrix(x=x,id=id,mergeBy=mergeBy,mc.cores=mc.cores)
+}
+)
+
+## Genes x Factors data frame
+setMethod("mergeReplicates",signature(x='data.frame'),
+          function(x,id,mergeBy='any',mc.cores=1) {
+              mergeReplicateMatrix(x=x,id=id,mergeBy=mergeBy,mc.cores=mc.cores)
+}
+)
+
+## Genomic Intervals GRangesList
+setMethod("mergeReplicates",signature(x='GRangesList'),
+          function(x,id,mergeBy='any',mc.cores=1) {
+              mergeReplicateList(x=x,id=id,mergeBy=mergeBy,mc.cores=mc.cores)
+}
+)
+
+## Genomic Intervals List
+setMethod("mergeReplicates",signature(x='list'),
+          function(x,id,mergeBy='any',mc.cores=1) {
+              x <- GRangesList(x)
+              mergeReplicates(x=x,id=id,mergeBy=mergeBy,mc.cores=mc.cores)
+}
+)
+
+## Factors MDS (Genes too, but no much sense doing that...)
+setMethod("mergeReplicates",signature(x='mds'),
+          function(x,id) {
+              mergeReplicateMDS(x=x,id=id)
+}
+)
 ## Merge replicates (Genes x Factors)
 ## Basically collapses columns to proportion of replicates with factor and then updates them before returning depending on selected mergeBy option
 mergeReplicateMatrix <- function(x,id,mergeBy='any',mc.cores=mc.cores)
@@ -20,33 +56,6 @@ mergeReplicateMatrix <- function(x,id,mergeBy='any',mc.cores=mc.cores)
         return(x)
     }
 
-## ## Merge Replicates (Genomic Intervals list)
-## ## For each replicate group checks proportion of samples for each replicate set group. Only peaks matching the desired mergeBy option are returned for that replicate
-## mergeReplicateList <- function(x,id,mergeBy='any',mc.cores=mc.cores)
-## {
-##     if (length(x)!=length(id)) stop('Non-conformable arguments')
-##     ans <- mclapply(sort(unique(id)),function(i)
-##                     {
-##                         sel <- which(id==i)
-##                         if (length(sel)==1) {
-##                             return(x[[sel]])
-##                         }
-##                         if (length(sel)>1)
-##                             {
-##                                 ## Concatenate sites via eval-parse
-##                                 txt <- paste("allsites <- c(",paste("x[[",sel,"]]",collapse=','),")",sep='')
-##                                 eval(parse(text=txt))
-##                                 suppressWarnings(n <- do.call(cbind,lapply(as.list(x[sel]),function(y) as.numeric(unlist(allsites %in% y)))))
-##                                 n <- rowSums(n) / ncol(n)
-##                                 if (mergeBy=='any') return(allsites[n>0])
-##                                 else if (mergeBy=='all') return(allsites[n==1])
-##                                 else return(allsites[n>=mergeBy])
-##                             }
-##                     },mc.cores=mc.cores)
-##     names(ans) <- sort(unique(id))
-##     return(ans)
-## }
-
 ## Merge Replicates (Genomic Intervals list)
 ## For each replicate group checks proportion of samples for each replicate set group. Only peaks matching the desired mergeBy option are returned for that replicate
 mergeReplicateList <- function(x,id,mergeBy='any',mc.cores=mc.cores)
@@ -64,7 +73,7 @@ mergeReplicateList <- function(x,id,mergeBy='any',mc.cores=mc.cores)
                                 #txt <- paste("allsites <- c(",paste("x[[",sel,"]]",collapse=','),")",sep='')
                                 #eval(parse(text=txt))
                                 allsites <- unlist(x[sel])
-                                suppressWarnings(n <- do.call(cbind,lapply(as.list(x[sel]),function(y) as.numeric(unlist(allsites %in% y)))))
+                                suppressWarnings(n <- do.call(cbind,lapply(as.list(x[sel]),function(y) as.numeric(unlist(allsites %over% y)))))
                                 n <- rowSums(n) / ncol(n)
                                 if (mergeBy=='any') return(allsites[n>0])
                                 else if (mergeBy=='all') return(allsites[n==1])
@@ -85,42 +94,3 @@ mergeReplicateMDS <- function(x,id)
         x@points <- p
         return(x)
     }
-
-## standard Generic
-setGeneric("mergeReplicates", function(x,id,mergeBy,...) standardGeneric("mergeReplicates"))
-
-## Genes x Factors matrix
-setMethod("mergeReplicates",signature(x='matrix'),
-          function(x,id,mergeBy='any',mc.cores=mc.cores) {
-              mergeReplicateMatrix(x=x,id=id,mergeBy=mergeBy,mc.cores=mc.cores)
-}
-)
-
-## Genes x Factors data frame
-setMethod("mergeReplicates",signature(x='data.frame'),
-          function(x,id,mergeBy='any',mc.cores=mc.cores) {
-              mergeReplicateMatrix(x=x,id=id,mergeBy=mergeBy,mc.cores=mc.cores)
-}
-)
-
-## Genomic Intervals GRangesList
-setMethod("mergeReplicates",signature(x='GRangesList'),
-          function(x,id,mergeBy='any',mc.cores=mc.cores) {
-              mergeReplicateList(x=x,id=id,mergeBy=mergeBy,mc.cores=mc.cores)
-}
-)
-
-## Genomic Intervals List
-setMethod("mergeReplicates",signature(x='list'),
-          function(x,id,mergeBy='any',mc.cores=mc.cores) {
-              mergeReplicateList(x=x,id=id,mergeBy=mergeBy,mc.cores=mc.cores)
-}
-)
-
-## Factors MDS (Genes too, but no much sense doing that...)
-setMethod("mergeReplicates",signature(x='mds'),
-          function(x,id) {
-              mergeReplicateMDS(x=x,id=id)
-}
-)
-

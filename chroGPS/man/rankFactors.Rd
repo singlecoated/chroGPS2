@@ -1,99 +1,71 @@
 \name{rankFactors}
 \alias{rankFactors}
-%- Also NEED an '\alias' for EACH other topic documented here.
+\alias{rankFactors-methods}
+\alias{rankFactors,data.frame-method}
+\alias{rankFactors,distGPS-method}
+\alias{rankFactors,matrix-method}
+
 \title{
 Function to help selecting candidate epigenetic factors based on
-Epigenetic Domain cohesion/separation or global predictive properties.  
-  %%  ~~function to do ... ~~
+Epigenetic Domain cohesion/separation.
 }
 \description{
-%%  ~~ A concise (1-5 lines) description of what the function does. ~~
+Function to help selecting candidate epigenetic factors based on
+Epigenetic Domain cohesion/separation. This function ranks all combinations of a certain size of epigenetic factors in the selected domain based on how much they contribute to provide a good cohesion and separation of the points of their epigenetic domain against the rest. This allows selection of the 'best' combination of epigenetic factors in a certain domain to generate informative epigenetic maps.
 }
 \usage{
 rankFactors(d, sampleinfo, ranktype = "domainDist", selName = "Color", selValue, k = NULL, mc.cores = 1)
 }
-%- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{d}{
-%%     ~~Describe \code{d} here~~
+A distGPS object with the epigenetic distances, see function distGPS.
 }
   \item{sampleinfo}{
-%%     ~~Describe \code{sampleinfo} here~~
+A data.frame object with at least the domain information for the epigenetic factors in the provided distance matrix. Sampleinfo rownames need to match row and colnames in the distance matrix.
 }
   \item{ranktype}{
-%%     ~~Describe \code{ranktype} here~~
+Character vector indicating the method to use. Currently only supporting 'domainDist' method.
 }
   \item{selName}{
-%%     ~~Describe \code{selName} here~~
+Name of the column containing the epigenetic domain information in the sampleinfo dataframe.
 }
   \item{selValue}{
-%%     ~~Describe \code{selValue} here~~
+Character indicating the name of the domain to be evaluated.
 }
   \item{k}{
-%%     ~~Describe \code{k} here~~
+Size of the factor combination to be evaluated.
 }
   \item{mc.cores}{
-%%     ~~Describe \code{mc.cores} here~~
+Cores to use in calls to parallel::mclapply.
 }
-}
-\details{
-%%  ~~ If necessary, more details than the description above ~~
 }
 \value{
-%%  ~Describe the value returned
-%%  If it is a LIST, use
-%%  \item{comp1 }{Description of 'comp1'}
-%%  \item{comp2 }{Description of 'comp2'}
-%% ...
-}
-\references{
-%% ~put references to the literature/web site here ~
+Named list with each evaluated combination of factors and:
+\item{inter }{Their resulting average inter-domain distance.}
+\item{intra }{Their resulting average intra-domain distance.}
 }
 \author{
-%%  ~~who you are~~
+Oscar Reina.
 }
-\note{
-%%  ~~further notes~~
-}
-
-%% ~Make other sections like Warning with \section{Warning }{....} ~
-
 \seealso{
-%% ~~objects to See Also as \code{\link{help}}, ~~~
+\code{\link{distGPS}}, \code{\link{domainDist}}
 }
 \examples{
-##---- Should be DIRECTLY executable !! ----
-##-- ==>  Define data, use random,
-##--	or do  help(data=index)  for the standard data sets.
 
-## The function is currently defined as
-function (d, sampleinfo, ranktype = "domainDist", selName = "Color", 
-    selValue, k = NULL, mc.cores = 1) 
-{
-    domains <- sampleinfo
-    if (!selName \%in\% colnames(domains)) 
-        stop("Invalid sel name in sampleinfo")
-    ff <- rownames(domains)[domains$Domain == selValue]
-    ff <- combs(ff, k = k)
-    cat(sprintf("\n### Evaluating \%s domain ###\n", selValue))
-    dd <- parallel::mclapply(1:nrow(ff), function(i) {
-        sel <- rownames(domains) \%in\% ff[i, ] | domains$Domain != 
-            selValue
-        inter <- domainDist(as.matrix(d)[sel, sel], gps = "factors", 
-            domain = domains$Domain[sel], type = "inter", plot = FALSE, 
-            avg = FALSE)
-        inter <- inter[grep(selValue, names(inter))]
-        inter <- mean(unlist(inter))
-        intra <- mean(domainDist(as.matrix(d)[sel, sel], gps = "factors", 
-            domain = domains$Domain[sel], type = "intra", plot = FALSE, 
-            avg = TRUE)$Avg)
-        return(list(inter = inter, intra = intra))
-    }, mc.cores = mc.cores)
-    names(dd) <- apply(ff, 1, paste, collapse = " + ")
-    dd
-  }
+## Rank Factors by Domain, using intra/inter domain distance
+
+data(s2)
+data(toydists)
+#d <- distGPS(s2,metric='avgdist',mc.cores=8) # Compute distances
+rownames(s2names) <- s2names$ExperimentName
+
+# Known domains
+# Call rankFactors for HP1a repression domain, select a combination of 4
+# factors
+library(caTools)
+rank.factors.4 <- rankFactors(d,s2names,ranktype='domainDist',selName='Color',selValue='lightblue',k=3,mc.cores=4) # Test HP1a repression
+ddd <- as.data.frame(do.call(rbind,lapply(rank.factors.4,unlist)))
+ddd <- ddd[order(ddd$intra,decreasing=FALSE),]
+head(ddd)
+
 }
-% Add one or more standard keywords, see file 'KEYWORDS' in the
-% R documentation directory.
-\keyword{ ~kwd1 }% use one of  RShowDoc("KEYWORDS")
-\keyword{ ~kwd2 }% __ONLY ONE__ keyword per line

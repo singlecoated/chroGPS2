@@ -81,5 +81,37 @@ Oscar Reina.
 See functions \code{distGPS, mds} for generating chroGPS-factors maps.
 }
 \examples{
+## Not run
+
+data(s2)
+data(repliSeq)
+library(gplots)
+
+# Modify colors and add some transparency
+fnames <- s2names$Factor
+s2names$Color[s2names$Color=='grey'] <- 'orange'
+fcolors <- paste(col2hex(s2names$Color),'BB',sep='')
+bcolors <- paste(col2hex(s2names$Color),'FF',sep='')
+
+# Select time points to compare
+m1 <- m.origs[['Early.Mid']]
+m2 <- m.origs[['Late']]
+
+## Perform differential Procrustes analysis
+pp <- diffFactors(m1,m2)
+
+## Plot both maps before and after adjustment
+m3 <- pp$mds3
+plot(0,xlim=c(-1,1),ylim=c(-1,1),xlab='',ylab='',xaxt='n',yaxt='n',col='NA')
+segments(m1@points[,1],m1@points[,2],m3@points[,1],m3@points[,2],col='red')
+par(new=TRUE)
+plot(m1,drawlabels=TRUE,labels=s2names$Factor,point.pch=19,point.cex=4,text.cex=0.75,point.col=s2names$Color,main=sprintf('S2@Origins, adjusted (Avgdist-isoMDS)'),font=2,xlim=c(-1,1),ylim=c(-1,1))
+par(new=TRUE)
+plot(m3,drawlabels=TRUE,labels=s2names$Factor,point.pch=19,point.cex=4,text.cex=0.75,point.col=s2names$Darkcolor,text.col='grey',main='',xaxt='n',yaxt='n',font=2,xlim=c(-1,1),ylim=c(-1,1))
+
+## Plot Procrustes errors
+pp <- pp$procrustes
+par(las=1,mar=c(4,12,4,4)); barplot(sort(residuals(pp),decr=TRUE),horiz=TRUE,xlim=c(0,max(residuals(pp))+.1),col=heat.colors(length(residuals(pp))),main='Procrustes errors')
+hist(residuals(pp),breaks=50)
 }
 \keyword{ ~mds }
